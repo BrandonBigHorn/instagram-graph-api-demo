@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # Instagram Graph API — Engagement Data Pipeline
 
 A Python project that connects to the Instagram Graph API to pull likes and comments data, store daily engagement snapshots, and lay the groundwork for a dashboard layer.
@@ -150,7 +149,3 @@ The dashboard reads from the database rather than hitting the API directly — t
 - `python-dotenv` — environment variable management
 - `sqlite3` — built-in, no extra install needed
 - `pytest` — unit testing
-=======
-# instagram-graph-api-demo
-Demoing using the instagram Graph API
->>>>>>> ea59bee8b8ed879dcde5e2314676f1722526ca2a
