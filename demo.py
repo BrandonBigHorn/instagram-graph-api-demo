@@ -16,6 +16,7 @@ database.DB_PATH = "data/demo.db"
 
 from mock_client import MockInstagramClient
 from database import init_db, upsert_media, upsert_comments, save_daily_snapshot, get_engagement_trend
+from report import generate_report
 
 def run_demo():
     print("\n" + "=" * 55)
@@ -60,7 +61,13 @@ def run_demo():
     for row in trend:
         print(f"   {row['snapshot_date']} — ❤️  {row['like_count']} | 💬 {row['comments_count']}")
 
-    print("\n✅ Demo complete. Database written to data/demo.db")
+    # CSV Report
+    print("\n📄 Generating CSV report...")
+    report_path = generate_report()
+    if report_path:
+        print(f"   Report saved to: {report_path}")
+
+    print("\n✅ Demo complete.")
     print("=" * 55 + "\n")
 
 if __name__ == "__main__":

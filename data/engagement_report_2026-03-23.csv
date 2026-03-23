@@ -1,0 +1,14 @@
+SECTION,Media ID,Media Type,Posted At,Caption (truncated),Like Count,Comment Count,Data Captured At
+POST,mock_media_001,IMAGE,2026-03-22T20:30:25.423169,Excited to share our latest product launch! #newproduct #launch,143,18,2026-03-23T20:30:25.429952
+POST,mock_media_002,IMAGE,2026-03-20T20:30:25.423169,Behind the scenes look at our team 🎉 #team #culture,94,12,2026-03-23T20:30:25.429952
+POST,mock_media_003,VIDEO,2026-03-16T20:30:25.423169,Weekly tip: consistency is key. What are your goals this week?,217,35,2026-03-23T20:30:25.429952
+
+SECTION,Metric,Value
+SUMMARY,Report Date,2026-03-23
+SUMMARY,Total Posts Analyzed,3
+SUMMARY,Total Likes,454
+SUMMARY,Total Comments,65
+SUMMARY,Average Likes/Post,151.3
+SUMMARY,Average Comments/Post,21.7
+SUMMARY,Top Post (by likes),mock_media_003
+SUMMARY,Top Post Like Count,217
