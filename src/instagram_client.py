@@ -2,6 +2,10 @@
 Instagram Graph API Client
 Handles authentication, token management, and API requests
 with built-in rate limit handling and exponential backoff.
+
+Scopes updated January 2025 - old scope values (business_basic, etc.)
+were deprecated on January 27, 2025. This client uses the current
+required scope values for Instagram API with Instagram Login.
 """
 
 import time
@@ -9,18 +13,52 @@ import logging
 import requests
 from datetime import datetime, timedelta
 from typing import Optional
+from urllib.parse import urlencode
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
 
+# Current required scopes for Instagram API with Instagram Login
+# Ref: https://developers.facebook.com/docs/instagram-platform/instagram-api-with-instagram-login
+# Old values (deprecated Jan 27 2025): business_basic, business_manage_comments
+SCOPES = [
+    "instagram_business_basic",            # Read profile and media
+    "instagram_business_manage_comments",  # Read and manage comments
+]
+
 
 class InstagramClient:
-    BASE_URL = "https://graph.instagram.com/v18.0"
+    BASE_URL = "https://graph.instagram.com/v21.0"  # Latest stable version as of 2025
 
     def __init__(self, access_token: str, token_expiry: Optional[datetime] = None):
         self.access_token = access_token
         self.token_expiry = token_expiry
         self.session = requests.Session()
+
+    # ------------------------------------------------------------------
+    # OAuth Helpers
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def build_auth_url(app_id: str, redirect_uri: str) -> str:
+        """
+        Builds the OAuth authorization URL to send to the account owner.
+        They visit this URL, log in with Instagram, and approve the requested scopes.
+        After approval, Instagram redirects them to redirect_uri with a short-lived code.
+
+        Required scopes use the new names (post Jan 27 2025):
+          - instagram_business_basic
+          - instagram_business_manage_comments
+        """
+        params = {
+            "client_id": app_id,
+            "redirect_uri": redirect_uri,
+            "scope": ",".join(SCOPES),
+            "response_type": "code",
+        }
+        url = f"https://api.instagram.com/oauth/authorize?{urlencode(params)}"
+        logger.info(f"Auth URL built for app {app_id}")
+        return url
 
     # ------------------------------------------------------------------
     # Token Management
@@ -35,7 +73,7 @@ class InstagramClient:
             return False
         return datetime.utcnow() >= (self.token_expiry - timedelta(days=buffer_days))
 
-    def refresh_long_lived_token(self, app_secret: str) -> dict:
+    def refresh_long_lived_token(self) -> dict:
         """
         Exchanges the current long-lived token for a fresh one.
         Long-lived tokens last 60 days. Refreshing resets the clock.
@@ -58,6 +96,8 @@ class InstagramClient:
         """
         Exchanges a short-lived token (1 hour) for a long-lived token (60 days).
         This is the first step after a user completes the OAuth flow.
+
+        Instagram API with Instagram Login token exchange endpoint.
         """
         logger.info("Exchanging short-lived token for long-lived token...")
         url = "https://graph.instagram.com/access_token"
@@ -85,6 +125,7 @@ class InstagramClient:
         """
         Fetch recent media posts for the account.
         Returns a list of media objects with id, caption, type, and timestamp.
+        Requires: instagram_business_basic scope
         """
         url = f"{self.BASE_URL}/me/media"
         params = {
@@ -98,6 +139,7 @@ class InstagramClient:
         """
         Fetch engagement insights for a specific media post.
         Returns impressions, reach, likes, comments, saves, and shares.
+        Requires: instagram_business_basic scope
         """
         url = f"{self.BASE_URL}/{media_id}/insights"
         params = {
@@ -106,14 +148,17 @@ class InstagramClient:
         return self._request("GET", url, params=params)
 
     def get_comments(self, media_id: str) -> list:
-        """Fetch all comments for a specific media post."""
+        """
+        Fetch all comments for a specific media post.
+        Requires: instagram_business_manage_comments scope
+        """
         url = f"{self.BASE_URL}/{media_id}/comments"
         params = {"fields": "id,text,timestamp,username"}
         response = self._request("GET", url, params=params)
         return response.get("data", [])
 
     # ------------------------------------------------------------------
-    # Request Handler — Rate Limiting + Exponential Backoff
+    # Request Handler - Rate Limiting + Exponential Backoff
     # ------------------------------------------------------------------
 
     def _request(
@@ -140,7 +185,7 @@ class InstagramClient:
 
         # Proactive token refresh check before every request
         if self.is_token_expiring_soon():
-            logger.warning("Token expiring soon — consider refreshing before the next run.")
+            logger.warning("Token expiring soon - consider refreshing before the next run.")
 
         rate_limit_codes = {4, 17, 32, 80001, 80006, 613}
 
