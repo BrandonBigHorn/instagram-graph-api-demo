@@ -1,14 +1,10 @@
 """
 Daily Engagement Pull Job
 -------------------------
-Pulls the latest likes and comments for all recent media posts
-and stores snapshots in the local database.
-
-Run manually:      python src/pull_job.py
-Run on a schedule: cron, APScheduler, or a cloud task runner (e.g. AWS Lambda + EventBridge)
-
-Cron example (runs every day at 8am UTC):
-    0 8 * * * /usr/bin/python3 /path/to/src/pull_job.py >> /var/log/instagram_pull.log 2>&1
+Supports both Instagram Login and Facebook Login flows.
+Set AUTH_FLOW in your .env to control which client is used:
+  AUTH_FLOW=instagram  (default)
+  AUTH_FLOW=facebook   (for accounts linked to a Facebook Page)
 """
 
 import os
@@ -17,6 +13,7 @@ from datetime import datetime
 from dotenv import load_dotenv
 
 from instagram_client import InstagramClient, InstagramAPIError
+from facebook_client import FacebookLoginClient, FacebookAPIError
 from database import init_db, upsert_media, upsert_comments, save_daily_snapshot
 
 load_dotenv()
@@ -29,28 +26,41 @@ def run_pull():
     logger.info(f"Pull job started at {datetime.utcnow().isoformat()}")
     logger.info("=" * 50)
 
-    # --- Init ---
     init_db()
 
     access_token = os.getenv("INSTAGRAM_ACCESS_TOKEN")
+    auth_flow    = os.getenv("AUTH_FLOW", "instagram").lower()
+
     if not access_token:
         raise EnvironmentError("INSTAGRAM_ACCESS_TOKEN not set. Check your .env file.")
 
-    client = InstagramClient(access_token=access_token)
+    if auth_flow == "facebook":
+        ig_account_id = os.getenv("INSTAGRAM_ACCOUNT_ID")
+        if not ig_account_id:
+            raise EnvironmentError(
+                "INSTAGRAM_ACCOUNT_ID not set. "
+                "Run the auth flow first to auto-discover it."
+            )
+        client = FacebookLoginClient(
+            access_token=access_token,
+            instagram_account_id=ig_account_id
+        )
+        logger.info("Using Facebook Login client.")
+    else:
+        client = InstagramClient(access_token=access_token)
+        logger.info("Using Instagram Login client.")
 
-    # --- Profile check ---
     try:
         profile = client.get_user_profile()
         logger.info(f"Authenticated as @{profile.get('username')} (ID: {profile.get('id')})")
-    except InstagramAPIError as e:
+    except (InstagramAPIError, FacebookAPIError) as e:
         logger.error(f"Authentication failed: {e}")
         return
 
-    # --- Pull recent media ---
     try:
         posts = client.get_media(limit=20)
         logger.info(f"Fetched {len(posts)} media posts.")
-    except InstagramAPIError as e:
+    except (InstagramAPIError, FacebookAPIError) as e:
         logger.error(f"Failed to fetch media: {e}")
         return
 
@@ -58,25 +68,20 @@ def run_pull():
         logger.info("No media found for this account. Exiting.")
         return
 
-    # --- Store media records ---
     upsert_media(posts)
 
-    # --- Pull comments + save daily snapshots ---
     for post in posts:
-        media_id = post["id"]
-        like_count = post.get("like_count", 0)
+        media_id       = post["id"]
+        like_count     = post.get("like_count", 0)
         comments_count = post.get("comments_count", 0)
 
-        # Daily snapshot for trend tracking
         save_daily_snapshot(media_id, like_count, comments_count)
 
-        # Pull and store comments
         try:
             comments = client.get_comments(media_id)
             if comments:
                 upsert_comments(comments, media_id)
-        except InstagramAPIError as e:
-            # Log and continue — don't let one failed post kill the whole job
+        except (InstagramAPIError, FacebookAPIError) as e:
             logger.warning(f"Could not fetch comments for {media_id}: {e}")
             continue
 

@@ -1,10 +1,10 @@
 """
 Generate Auth URL
 -----------------
-Prints the OAuth authorization URL to send to the Instagram account owner.
-They visit this URL, log in, and approve your app.
-After approval, Instagram redirects them to your callback URL
-and the auth_server.py catches the token automatically.
+Generates the correct OAuth URL based on AUTH_FLOW in your .env file.
+
+  AUTH_FLOW=instagram  -> Instagram Login URL
+  AUTH_FLOW=facebook   -> Facebook Login URL
 
 Run with: python src/generate_auth_url.py
 """
@@ -15,19 +15,27 @@ sys.path.insert(0, os.path.dirname(__file__))
 
 from dotenv import load_dotenv
 from instagram_client import InstagramClient
+from facebook_client import FacebookLoginClient
 
 load_dotenv()
 
 APP_ID       = os.getenv("INSTAGRAM_APP_ID")
 REDIRECT_URI = os.getenv("INSTAGRAM_REDIRECT_URI", "http://localhost:8000/callback")
+AUTH_FLOW    = os.getenv("AUTH_FLOW", "instagram").lower()
 
 if not APP_ID:
     raise EnvironmentError("INSTAGRAM_APP_ID not set in .env file.")
 
-url = InstagramClient.build_auth_url(app_id=APP_ID, redirect_uri=REDIRECT_URI)
+if AUTH_FLOW == "facebook":
+    url = FacebookLoginClient.build_auth_url(app_id=APP_ID, redirect_uri=REDIRECT_URI)
+    flow_label = "Facebook Login (for accounts linked to a Facebook Page)"
+else:
+    url = InstagramClient.build_auth_url(app_id=APP_ID, redirect_uri=REDIRECT_URI)
+    flow_label = "Instagram Login"
 
 print("\n" + "=" * 60)
-print("  Instagram Authorization URL")
+print(f"  Instagram Authorization URL")
+print(f"  Flow: {flow_label}")
 print("=" * 60)
 print(f"\n{url}\n")
 print("Steps:")
