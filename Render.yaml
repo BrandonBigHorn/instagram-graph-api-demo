@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: instagram-engagement-tracker
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn src.auth_server:app --bind 0.0.0.0:$PORT
+    envVars:
+      - key: INSTAGRAM_APP_ID
+        sync: false
+      - key: INSTAGRAM_APP_SECRET
+        sync: false
+      - key: INSTAGRAM_REDIRECT_URI
+        sync: false
+      - key: AUTH_FLOW
+        value: facebook
+      - key: DB_PATH
+        value: data/instagram.db
