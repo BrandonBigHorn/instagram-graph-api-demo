@@ -14,11 +14,16 @@ ENV variables required (set in Render dashboard):
 """
 
 import os
+import sys
 import logging
 import sqlite3
 from datetime import datetime
 from flask import Flask, request, jsonify, redirect
 from dotenv import load_dotenv
+
+# Allow imports from the src/ directory regardless of where gunicorn is launched from
+sys.path.insert(0, os.path.dirname(__file__))
+
 from instagram_client import InstagramClient
 from facebook_client import FacebookLoginClient
 
